@@ -196,7 +196,7 @@ async function sendMessage() {
         </div>
     `;
     chatMessages.appendChild(typingDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    scrollToBottomIfNear();
 
     try {
         const response = await fetch('/chat/stream', {
@@ -221,7 +221,7 @@ async function sendMessage() {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message bot';
         chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        const wasNearBottom = isNearBottom();
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
@@ -241,7 +241,9 @@ async function sendMessage() {
                         if (data.text) {
                             fullText += data.text;
                             messageDiv.innerHTML = marked.parse(fullText);
-                            chatMessages.scrollTop = chatMessages.scrollHeight;
+                            if (wasNearBottom) {
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
                         } else if (data.done) {
                             speak(fullText);
                             // Reload chat history to show new chat
@@ -266,7 +268,18 @@ async function sendMessage() {
     sendButton.disabled = false;
 }
 
+function isNearBottom() {
+    return chatMessages.scrollTop + chatMessages.clientHeight >= chatMessages.scrollHeight - 10;
+}
+
+function scrollToBottomIfNear() {
+    if (isNearBottom()) {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+}
+
 function addMessage(role, message) {
+    const wasNearBottom = isNearBottom();
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
     if (role === 'bot') {
@@ -275,7 +288,9 @@ function addMessage(role, message) {
         messageDiv.textContent = message;
     }
     chatMessages.appendChild(messageDiv);
-    chatMessages.scrollTop = chatMessages.scrollHeight;
+    if (wasNearBottom) {
+        scrollToBottomIfNear();
+    }
 }
 
 function getRandomSuggestions(count = 3) {
@@ -321,6 +336,10 @@ async function loadHistory() {
             data.history.forEach(item => {
                 addMessage(item.role, item.message);
             });
+            // Ensure chat is scrolled to bottom after loading history
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 0);
         }
     } catch (error) {
         console.error('Error loading history:', error);
@@ -369,10 +388,10 @@ function startNewChat() {
 async function loadChat(chatSessionId) {
     // Set the session ID to the selected chat
     sessionId = chatSessionId;
-    
+
     // Clear current messages
     chatMessages.innerHTML = '';
-    
+
     // Load the history for this session
     try {
         const response = await fetch(`/history?session_id=${sessionId}`);
@@ -383,6 +402,10 @@ async function loadChat(chatSessionId) {
             data.history.forEach(item => {
                 addMessage(item.role, item.message);
             });
+            // Ensure chat is scrolled to bottom after loading history
+            setTimeout(() => {
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }, 0);
         } else {
             // If no messages, show empty state
             chatMessages.innerHTML = `
@@ -402,7 +425,7 @@ async function loadChat(chatSessionId) {
     } catch (error) {
         console.error('Error loading history:', error);
     }
-    
+
     // Update active state in sidebar
     document.querySelectorAll('.chat-item').forEach(item => {
         item.classList.remove('active');
