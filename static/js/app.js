@@ -103,7 +103,6 @@ function toggleTTS() {
     localStorage.setItem('tts-enabled', isTTSEnabled);
     updateTTSButton();
     
-    // Stop any ongoing speech
     if (!isTTSEnabled && 'speechSynthesis' in window) {
         window.speechSynthesis.cancel();
     }
@@ -137,14 +136,24 @@ function toggleSpeechRecognition() {
 
 function speak(text) {
     if (!isTTSEnabled || !('speechSynthesis' in window)) return;
-
-    // Cancel any ongoing speech
     window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = 1.2; 
+    utterance.pitch = 1.8; 
     utterance.volume = 1.0;
+
+    // Attempt to select an Asian girl's voice (comes down to system voices)
+    const voices = window.speechSynthesis.getVoices();
+    // Prefer Japanese or Korean female voices, fallback to any female voice, then default
+    let selectedVoice = voices.find(v => v.lang === 'ja-JP' && v.name.toLowerCase().includes('female'));
+    if (!selectedVoice) selectedVoice = voices.find(v => v.lang === 'ja-JP');
+    if (!selectedVoice) selectedVoice = voices.find(v => v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('girl'));
+    if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith('en') || v.lang.startsWith('zh') || v.lang.startsWith('ko')); 
+    if (!selectedVoice) selectedVoice = voices[0];
+
+    utterance.voice = selectedVoice;
+
     window.speechSynthesis.speak(utterance);
 }
 
@@ -463,15 +472,28 @@ function showContextMenu(event, chatId) {
     contextMenu.classList.add('show');
 }
 
-async function deleteChat() {
+function showDeleteConfirmation() {
+    contextMenu.classList.remove('show');
     if (!currentChatToDelete) return;
     
-    contextMenu.classList.remove('show');
-    
-    if (!confirm('Are you sure you want to delete this chat?')) {
-        currentChatToDelete = null;
-        return;
-    }
+    const modal = document.getElementById('delete-modal');
+    modal.classList.add('show');
+}
+
+function cancelDelete() {
+    const modal = document.getElementById('delete-modal');
+    modal.classList.remove('show');
+    currentChatToDelete = null;
+}
+
+function confirmDelete() {
+    const modal = document.getElementById('delete-modal');
+    modal.classList.remove('show');
+    deleteChat();
+}
+
+async function deleteChat() {
+    if (!currentChatToDelete) return;
 
     try {
         const response = await fetch('/history/clear', {

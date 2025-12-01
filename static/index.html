@@ -148,12 +148,24 @@
 
     <!-- Context Menu for Chat Items -->
     <div id="context-menu" class="context-menu">
-        <button class="context-menu-item" onclick="deleteChat()">
+        <button class="context-menu-item" onclick="showDeleteConfirmation()">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/>
             </svg>
             Delete
         </button>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="delete-modal">
+        <div class="delete-modal-content">
+            <h3>Delete Chat</h3>
+            <p>Are you sure you want to delete this chat? This action cannot be undone.</p>
+            <div class="delete-modal-buttons">
+                <button class="delete-modal-cancel" onclick="cancelDelete()">Cancel</button>
+                <button class="delete-modal-confirm" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/marked.min.js"></script>
