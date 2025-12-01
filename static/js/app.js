@@ -12,6 +12,24 @@ const mainContent = document.querySelector('.main-content');
 // Context menu
 const contextMenu = document.getElementById('context-menu');
 
+const suggestionPool = [
+    "Tell me a fun fact",
+    "Explain quantum computing",
+    "Write a short poem",
+    "What's the weather like today?",
+    "Tell me a joke",
+    "How does photosynthesis work?",
+    "What are some healthy breakfast ideas?",
+    "Explain the concept of recursion",
+    "What's the meaning of life?",
+    "Tell me about space exploration",
+    "How to meditate for beginners?",
+    "What's artificial intelligence?",
+    "Give me cooking tips",
+    "Explain blockchain technology",
+    "What's your favorite color?"
+];
+
 let sessionId = 'session_' + Date.now();
 let recognition = null;
 let isRecording = false;
@@ -213,7 +231,7 @@ async function sendMessage() {
                         const data = JSON.parse(line.slice(6));
                         if (data.text) {
                             fullText += data.text;
-                            messageDiv.textContent = fullText;
+                            messageDiv.innerHTML = marked.parse(fullText);
                             chatMessages.scrollTop = chatMessages.scrollHeight;
                         } else if (data.done) {
                             speak(fullText);
@@ -242,9 +260,40 @@ async function sendMessage() {
 function addMessage(role, message) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `message ${role}`;
-    messageDiv.textContent = message;
+    if (role === 'bot') {
+        messageDiv.innerHTML = marked.parse(message);
+    } else {
+        messageDiv.textContent = message;
+    }
     chatMessages.appendChild(messageDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function getRandomSuggestions(count = 3) {
+    const shuffled = [...suggestionPool].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+}
+
+function generateSuggestionChipsHTML(suggestions) {
+    const icons = [
+        'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z',
+        'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
+        'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z',
+        'M3 15a4 4 0 004 4h11a3 3 0 002.995-2.824L21 15v2.18a3 3 0 01-.171.923L15.5 21l-5-3-5.329 3L3 17.18V15zm15-3a1 1 0 110-2 1 1 0 010 2z',
+        'M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z',
+        'M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z'
+    ];
+
+    return suggestions.map((text, index) => {
+        const iconPath = icons[index % icons.length];
+        const escapedText = text.replace(/'/g, '\\$&');
+        return `<div class="chip" onclick="sendSuggestion('${escapedText}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="${iconPath}"/>
+            </svg>
+            ${text}
+        </div>`;
+    }).join('');
 }
 
 async function loadHistory() {
@@ -276,7 +325,11 @@ function toggleSidebar() {
 function startNewChat() {
     // Generate new session ID
     sessionId = 'session_' + Date.now();
-    
+
+    // Get random suggestions
+    const randomSuggestions = getRandomSuggestions(3);
+    const suggestionChipsHTML = generateSuggestionChipsHTML(randomSuggestions);
+
     // Clear current messages and show empty state
     chatMessages.innerHTML = `
         <div class="empty-state">
@@ -290,33 +343,16 @@ function startNewChat() {
                 Ask me anything! I'm here to help with questions, ideas, or just a friendly chat.
             </div>
             <div class="suggestion-chips">
-                <div class="chip" onclick="sendSuggestion('Tell me a fun fact')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                    </svg>
-                    Tell me a fun fact
-                </div>
-                <div class="chip" onclick="sendSuggestion('Explain quantum computing')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                    </svg>
-                    Explain quantum computing
-                </div>
-                <div class="chip" onclick="sendSuggestion('Write a short poem')">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                    </svg>
-                    Write a short poem
-                </div>
+                ${suggestionChipsHTML}
             </div>
         </div>
     `;
-    
+
     // Remove active class from all chat items
     document.querySelectorAll('.chat-item').forEach(item => {
         item.classList.remove('active');
     });
-    
+
     // Reload chat history
     loadChatHistory();
 }
@@ -480,6 +516,12 @@ newChatBtn.addEventListener('click', (e) => {
 
 // Make sidebar header clickable to toggle
 sidebar.querySelector('.sidebar-header').addEventListener('click', (e) => {
+    toggleSidebar();
+});
+
+// Sidebar toggle button
+document.getElementById('sidebar-toggle').addEventListener('click', (e) => {
+    e.stopPropagation();
     toggleSidebar();
 });
 
