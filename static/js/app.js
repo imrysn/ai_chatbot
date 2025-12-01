@@ -43,33 +43,38 @@ messageInput.addEventListener('input', function() {
 });
 
 // Initialize speech recognition
+// Check if browser supports Web Speech API (Chrome, Edge, Safari)
 if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.continuous = false;        // Stop after first recognition
+    recognition.interimResults = false;   // Only final results, no partial transcripts
+    recognition.lang = 'en-US';           // Language for recognition
 
+    // Handle successful speech recognition
     recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        messageInput.value = transcript;
-        messageInput.style.height = 'auto';
-        messageInput.style.height = (messageInput.scrollHeight) + 'px';
+        const transcript = event.results[0][0].transcript;  // Get the recognized text
+        messageInput.value = transcript;                     // Set input field value
+        messageInput.style.height = 'auto';                 // Reset height for auto-resize
+        messageInput.style.height = (messageInput.scrollHeight) + 'px';  // Auto-resize
         isRecording = false;
-        micButton.classList.remove('recording');
+        micButton.classList.remove('recording');            // Update UI state
     };
 
+    // Handle speech recognition errors
     recognition.onerror = (event) => {
         console.error('Speech recognition error:', event.error);
         isRecording = false;
         micButton.classList.remove('recording');
     };
 
+    // Handle recognition end (either success or cancellation)
     recognition.onend = () => {
         isRecording = false;
         micButton.classList.remove('recording');
     };
 } else {
+    // Disable voice input if not supported
     micButton.disabled = true;
     micButton.setAttribute('data-tooltip', 'Speech recognition not supported');
 }
@@ -87,8 +92,23 @@ if (savedTTS !== null) {
 
 // Load chat history on page load
 window.addEventListener('load', () => {
-    loadHistory();
-    loadChatHistory();
+    // Show loading indicator while loading chat data
+    const loadingIndicator = document.createElement('div');
+    loadingIndicator.className = 'loading-indicator';
+    loadingIndicator.innerHTML = `
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <div>Loading chat history...</div>
+        </div>
+    `;
+    chatMessages.appendChild(loadingIndicator);
+
+    loadHistory().then(() => {
+        loadChatHistory().then(() => {
+            // Remove loading indicator once data is loaded
+            loadingIndicator.remove();
+        });
+    });
 });
 
 function toggleTheme() {
@@ -174,20 +194,23 @@ async function sendMessage() {
     const message = messageInput.value.trim();
     if (message === '') return;
 
-    // Clear empty state
+    // Remove empty state UI when user sends first message
     const emptyState = chatMessages.querySelector('.empty-state');
     if (emptyState) {
         emptyState.style.animation = 'fadeOut 0.3s ease-out';
         setTimeout(() => emptyState.remove(), 300);
     }
 
+    // Add user's message to chat UI
     addMessage('user', message);
+
+    // Reset input field and disable controls during API call
     messageInput.value = '';
     messageInput.style.height = 'auto';
     messageInput.disabled = true;
     sendButton.disabled = true;
 
-    // Add typing indicator
+    // Show typing indicator while waiting for AI response
     const typingDiv = document.createElement('div');
     typingDiv.className = 'typing-indicator';
     typingDiv.innerHTML = `
@@ -199,6 +222,7 @@ async function sendMessage() {
     scrollToBottomIfNear();
 
     try {
+        // Send message to streaming endpoint with session ID
         const response = await fetch('/chat/stream', {
             method: 'POST',
             headers: {
@@ -210,45 +234,50 @@ async function sendMessage() {
             }),
         });
 
-        // Remove typing indicator
+        // Remove typing indicator once response starts
         typingDiv.remove();
 
         if (!response.ok) {
             throw new Error('Network response was not ok');
         }
 
-        // Create message div for streaming
+        // Create bot message container for streaming content
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message bot';
         chatMessages.appendChild(messageDiv);
-        const wasNearBottom = isNearBottom();
+        const wasNearBottom = isNearBottom(); // Track scroll position for auto-scroll
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = '';
+        // Set up streaming response reader
+        const reader = response.body.getReader();  // Get stream reader
+        const decoder = new TextDecoder();         // Decode bytes to text
+        let fullText = '';                         // Accumulate complete response
 
+        // Read streaming data in chunks
         while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+            const { done, value } = await reader.read();  // Read next chunk
+            if (done) break;                              // End of stream
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
+            const chunk = decoder.decode(value);          // Decode chunk to text
+            const lines = chunk.split('\n');             // SSE messages are line-separated
 
             for (const line of lines) {
-                if (line.startsWith('data: ')) {
+                if (line.startsWith('data: ')) {          // Process SSE data lines
                     try {
-                        const data = JSON.parse(line.slice(6));
+                        const data = JSON.parse(line.slice(6));  // Parse JSON payload
                         if (data.text) {
+                            // Append new text chunk and render markdown
                             fullText += data.text;
                             messageDiv.innerHTML = marked.parse(fullText);
+                            // Auto-scroll if user was near bottom
                             if (wasNearBottom) {
                                 chatMessages.scrollTop = chatMessages.scrollHeight;
                             }
                         } else if (data.done) {
-                            speak(fullText);
-                            // Reload chat history to show new chat
-                            loadChatHistory();
+                            // Stream complete - trigger TTS and update sidebar
+                            speak(fullText);              // Speak full response
+                            loadChatHistory();            // Refresh sidebar chat list
                         } else if (data.error) {
+                            // Display streaming error
                             messageDiv.textContent = 'Error: ' + data.error;
                         }
                     } catch (e) {
@@ -259,11 +288,13 @@ async function sendMessage() {
         }
 
     } catch (error) {
+        // Handle network/streaming errors
         typingDiv.remove();
         addMessage('bot', '❌ Error: Unable to fetch response. Please try again.');
         console.error('Error:', error);
     }
 
+    // Re-enable input controls
     messageInput.disabled = false;
     sendButton.disabled = false;
 }
